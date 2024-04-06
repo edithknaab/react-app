@@ -7,12 +7,9 @@ def deploy_to_ec2(repo_url):
     ec2_username = 'ec2-user'
     ec2_key_path = 'csc497.pem'  # Update the path to the PEM file
 
-    # Create SSH configuration
-    config = Config(overrides={'sudo': {'password': 'your_sudo_password'}})
-
     try:
         # Connect to EC2 instance
-        conn = Connection(host=ec2_host, user=ec2_username, connect_kwargs={'key_filename': ec2_key_path}, config=config)
+        conn = Connection(host=ec2_host, user=ec2_username, connect_kwargs={'key_filename': ec2_key_path})
 
         # Commands to execute on EC2 instance
         with conn.cd('/home/ec2-user/react-app'):
