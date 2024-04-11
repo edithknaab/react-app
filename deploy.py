@@ -15,9 +15,9 @@ def deploy_to_ec2(repo_url):
 
         # commands used to execute ec2 instance connections
         with conn.cd('/home/ec2-user/react-app'):
-	    #pull recent commits from github
+	        #pull recent commits from github
             conn.run('git pull {}'.format(repo_url)) 
-	    # npm install
+	        # npm install
             conn.run('npm install')            
             # build an optimized version of the app
             conn.run('npm run build')          
@@ -38,3 +38,8 @@ if __name__ == "__main__":
     # Trigger deployment funciotn
     deploy_to_ec2(args.repo_url)
 
+
+#https://docs.fabfile.org/en/latest/api/connection.html
+#https://stackoverflow.com/questions/27957373/python-import-and-initialize-argparse-after-if-name-main
+#https://docs.python.org/3/library/argparse.html
+#
