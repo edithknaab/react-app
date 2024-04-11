@@ -1,4 +1,4 @@
-#import argparse and fabric to execute commans using python
+#import argparse and fabric to execute commands using python
 import argparse
 from fabric import Connection, Config
 #define function
