@@ -1,6 +1,6 @@
 #import argparse and fabric to execute commands using python
 import argparse
-from fabric import Connection, Config
+from fabric import Connection
 #define function
 def deploy_to_ec2(repo_url):
     # ec2 instance ip, username, and key path
@@ -23,7 +23,7 @@ def deploy_to_ec2(repo_url):
             conn.run('npm run build')          
             # run the applicatino using pm2
             conn.sudo('pm2 restart react-app')
-	#if succeffsul print this message
+	    #when succeffsul print this message, you shall not fail me!
         print("Deployment completed successfully!")
 
     except Exception as e:
@@ -42,4 +42,5 @@ if __name__ == "__main__":
 #https://docs.fabfile.org/en/latest/api/connection.html
 #https://stackoverflow.com/questions/27957373/python-import-and-initialize-argparse-after-if-name-main
 #https://docs.python.org/3/library/argparse.html
-#
+#https://www.phusionpassenger.com/library/deploy/nginx/automating_app_updates/python/
+    
