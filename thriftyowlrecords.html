@@ -1,0 +1,579 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+    
+        .table {
+            border-radius: 15px;
+            border: 3px solid #001489; 
+        }
+    
+        .table thead th {
+            background-color: #001489; 
+            color: #ffffff; 
+        }
+    
+        .form-select-sm {
+            border-radius: 5px;
+            background-color: #f2f2f2; 
+            color: #212529;
+            padding: 5px 10px;
+            width: 200px;
+            font-size: 14px;
+        }
+    
+        .form-select-sm:focus {
+            outline: 0;
+            box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.25); 
+        }
+    
+        #intake-search-filter, #outtake-search-filter {
+            width: 100%; 
+            border: 1px solid #f1f0ee; 
+            border-radius: 5px;
+            padding: 5px 10px;
+            margin-bottom: 10px; 
+        }
+    </style>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thrifty Owl Inventory Report</title>
+</head>
+<body onload="sortTableByDate('intake-table', 4); sortTableByDate('outtake-table', 4);">
+    <h2 style="font-family: 'Poppins', sans-serif; font-weight: 700;">Thrifty Owl Inventory Report</h2>
+    <div class="mb-3">
+        <label for="report-type" class="form-label">Select Report Type:</label>
+        <select class="form-select-sm" id="report-type" onchange="toggleReport()">
+          <option value="intake">Intake</option>
+          <option value="outtake">Outtake</option>
+        </select>
+    </div>
+    <hr>
+    <div id="intake-report" style="display: block;">
+        <h3 style="font-family: 'Poppins', sans-serif; font-weight: 700;">Intake Report</h3>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <input type="text" class="form-control me-2" id="intake-search-filter" onkeyup="searchIntakeTable()" placeholder="Search by 'Item' or 'Donor'..." style="flex-grow: 0; flex-shrink: 1; max-width: 300px;">
+            <div class="ms-auto d-flex align-items-center">
+                <label for="intake-date-filter-start" class="form-label me-2">Filter by Date:</label>
+                <input type="date" class="form-control me-2" id="intake-date-filter-start" onchange="filterIntakeByDate(); toggleClearIntakeDates();" style="width: auto;">
+                <label for="intake-date-filter-end" class="form-label me-2">:</label>
+                <input type="date" class="form-control me-2" id="intake-date-filter-end" onchange="filterIntakeByDate(); toggleClearIntakeDates();" style="width: auto;">
+                <button class="btn btn-primary me-2" id="clear-date-button-intake" style="display: none;" onclick="clearIntakeDates()">Clear Date</button>
+                <button class="btn btn-primary" onclick="printIntakeTable()">Print</button>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table id="intake-table" class="table table-bordered table-hover table-sm">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Material</th>
+                    <th>Value Per Item</th>
+                    <th>Weight</th>
+                    <th>Timestamp</th>
+                    <th>Amount Donated</th>
+                    <th>Donor Information</th>
+                    <th>Delete</th> 
+            </thead>
+            <tbody>
+                {% for item, intake_data in intake_info.items() %}
+                {% for intake_transaction in intake_data %}
+                <tr>
+                    <td>{{ intake_transaction.inventory.item_name }}</td>
+                    <td>{{ intake_transaction.inventory.material }}</td>
+                    <td>{{ intake_transaction.inventory.value_per_item }}</td>
+                    <td>{{ intake_transaction.inventory.weight }}</td>
+                    <td>
+                        {% set timestamp = intake_transaction.timestamp - timedelta(hours=4) %}
+                        {{ timestamp.strftime("%B %-d, %Y %I:%M %p") }}
+                    </td>                                          
+                    <td>{{ intake_transaction.quantity }}</td>
+                    <td>
+                        {{ intake_transaction.donor_info }}
+                        <img src="/static/images/edit.png" alt="Edit" style="width: 20px; height: 20px; cursor: pointer;" onclick="editTransaction('{{ intake_transaction.id }}', 'intake')">   
+                    </td>
+                    <td>
+                        <img src="/static/images/delete.png" alt="Delete" style="width: 20px; height: 20px; cursor: pointer;" onclick="deleteTransaction('{{ intake_transaction.id }}', 'intake')">
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div id="intake-total" class="total-value"></div>
+        <div id="intake-total-weight" class="total-weight"></div> 
+
+    </div>    
+    </div>
+
+    <div id="outtake-report" style="display: none;">
+        <h3 style="font-family: 'Poppins', sans-serif; font-weight: 700;">Outtake Report</h3>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <input type="text" class="form-control me-2" id="outtake-search-filter" onkeyup="searchOuttakeTable()" placeholder="Search by 'Item' or 'Recipient'..." style="flex-grow: 0; flex-shrink: 1; max-width: 300px;">
+            <div class="ms-auto d-flex align-items-center">
+                <label for="outtake-date-filter-start" class="form-label me-2">Filter by Date:</label>
+                <input type="date" class="form-control me-2" id="outtake-date-filter-start" onchange="filterOuttakeByDate(); toggleClearOuttakeDates();" style="width: auto;">
+                <label for="outtake-date-filter-end" class="form-label me-2">:</label> 
+                <input type="date" class="form-control me-2" id="outtake-date-filter-end" onchange="filterOuttakeByDate(); toggleClearOuttakeDates();" style="width: auto;">
+                <button class="btn btn-primary me-2" id="clear-date-button-outtake" style="display: none;" onclick="clearOuttakeDates()">Clear Date</button>
+                <button class="btn btn-primary" onclick="printOuttakeTable()">Print</button>
+            </div>
+        </div>        
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover table-sm" id="outtake-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Material</th>
+                    <th>Value Per Item</th>
+                    <th>Weight</th>
+                    <th>Timestamp</th>
+                    <th>Amount Taken</th>
+                    <th>Recipient Information</th>
+                    <th>Delete</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for outtake_transaction in outtake_transactions %}
+                <tr>
+                    <td>{{ outtake_transaction.inventory.item_name }}</td>
+                    <td>{{ outtake_transaction.inventory.material }}</td> 
+                    <td>{{ outtake_transaction.inventory.value_per_item }}</td>
+                    <td>{{ outtake_transaction.inventory.weight }}</td> 
+                    <td>
+                        {% set timestamp = outtake_transaction.timestamp - timedelta(hours=4) %}
+                        {{ timestamp.strftime("%B %-d, %Y %I:%M %p") }}
+                    </td>
+                    <td>{{ outtake_transaction.quantity }}</td> 
+                    <td>
+                        {{ outtake_transaction.donor_info }}
+                        <img src="/static/images/edit.png" alt="Edit" style="width: 20px; height: 20px; cursor: pointer;" onclick="editTransaction('{{ outtake_transaction.id }}', 'outtake')">
+                    </td>
+                    <td>
+                        <img src="/static/images/delete.png" alt="Delete" style="width: 20px; height: 20px; cursor: pointer;" onclick="deleteTransaction('{{ outtake_transaction.id }}', 'outtake')">
+                    </td>                                          
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div id="outtake-total" class="total-value"></div>
+        <div id="outtake-total-weight" class="total-weight"></div>
+    </div>
+    </div>
+    
+    <script>
+        function editTransaction(transactionId, type) {
+            Swal.fire({
+                title: 'Enter new donor info:',
+                input: 'text',
+                showCancelButton: true,
+                confirmButtonText: 'Submit',
+                confirmButtonColor: '#001489',
+                showLoaderOnConfirm: true,
+                preConfirm: (donorValue) => {
+                    if (donorValue.trim() === '') {
+                        Swal.showValidationMessage("You must enter a donor.");
+                    }
+                    return donorValue.trim();
+                }
+            }).then((donorResult) => {
+                if (donorResult.isConfirmed) {
+                    var donorInfo = donorResult.value;
+                    var url = type === 'intake' ? '/edit_intake_transaction' : '/edit_outtake_transaction';
+                    var data = { 'transaction_id': transactionId, 'donor_info': donorInfo };
+                    localStorage.setItem('reportType', type);
+
+                    fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Updated!',
+                                text: "Donor successfully updated.",
+                            }).then(() => {
+                                location.reload();
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Oops...',
+                                text: "An error occurred: " + data.message,
+                            });
+                        }
+                    })
+                    .catch((error) => {
+                        console.error('Error:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Oops...',
+                            text: 'Something went wrong!',
+                        });
+                    });
+                }
+            });
+        }
+        function toggleReport() {
+            var reportType = document.getElementById("report-type").value;
+            var storedReportType = localStorage.getItem('reportType');
+            if (storedReportType) {
+                reportType = storedReportType;
+                document.getElementById("report-type").value = reportType;
+                localStorage.removeItem('reportType');
+            }
+
+            if (reportType === "intake") {
+                document.getElementById("intake-report").style.display = "block";
+                document.getElementById("outtake-report").style.display = "none";
+            } else if (reportType === "outtake") {
+                document.getElementById("intake-report").style.display = "none";
+                document.getElementById("outtake-report").style.display = "block";
+            }
+        }
+
+        function searchIntakeTable() {
+            var input, filter, table, tr, td, i, txtValue;
+            input = document.getElementById("intake-search-filter");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("intake-table");
+            tr = table.getElementsByTagName("tr");
+            for (i = 0; i < tr.length; i++) {
+                var itemName_td = tr[i].getElementsByTagName("td")[0]; 
+                var donorInfo_td = tr[i].getElementsByTagName("td")[6]; 
+                if (itemName_td || donorInfo_td) {
+                    var itemName_text = itemName_td.textContent || itemName_td.innerText;
+                    var donorInfo_text = donorInfo_td.textContent || donorInfo_td.innerText;
+                    if (itemName_text.toUpperCase().indexOf(filter) > -1 || donorInfo_text.toUpperCase().indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                    } else {
+                        tr[i].style.display = "none";
+                    }
+                }
+            }
+            calculateIntakeTotal(); 
+        }
+
+function searchOuttakeTable() {
+    var input, filter, table, tr, td, i, txtValue;
+    input = document.getElementById("outtake-search-filter");
+    filter = input.value.toUpperCase();
+    table = document.getElementById("outtake-table");
+    tr = table.getElementsByTagName("tr");
+    for (i = 0; i < tr.length; i++) {
+        var itemName_td = tr[i].getElementsByTagName("td")[0]; 
+        var recipientInfo_td = tr[i].getElementsByTagName("td")[6]; 
+        if (itemName_td || recipientInfo_td) {
+            var itemName_text = itemName_td.textContent || itemName_td.innerText;
+            var recipientInfo_text = recipientInfo_td.textContent || recipientInfo_td.innerText;
+            if (itemName_text.toUpperCase().indexOf(filter) > -1 || recipientInfo_text.toUpperCase().indexOf(filter) > -1) {
+                tr[i].style.display = "";
+            } else {
+                tr[i].style.display = "none";
+            }
+        }
+    }
+    calculateOuttakeTotal(); 
+}
+
+        
+function calculateIntakeTotal() {
+    var intakeTotal = 0;
+    var intakeTotalWeight = 0; 
+    var table = document.getElementById("intake-table");
+    var rows = table.getElementsByTagName("tr");
+    for (var i = 1; i < rows.length; i++) {
+        if (rows[i].style.display !== "none") { 
+            var rowCells = rows[i].getElementsByTagName("td");
+            var valuePerItem = parseFloat(rowCells[2].innerText); 
+            var quantity = parseFloat(rowCells[5].innerText); 
+            var totalValue = valuePerItem * quantity; 
+            intakeTotal += totalValue;
+
+            var weight = parseFloat(rowCells[3].innerText);
+            intakeTotalWeight += isNaN(weight) ? 0 : (weight * quantity); 
+        }
+    }
+    console.log("Intake Total:", intakeTotal); 
+    console.log("Intake Total Weight:", intakeTotalWeight); 
+    document.getElementById("intake-total").innerText = "Total Value: $" + intakeTotal.toFixed(2);
+    document.getElementById("intake-total-weight").innerText = "Total Weight: " + intakeTotalWeight.toFixed(2) + " lbs"; 
+}
+function calculateOuttakeTotal() {
+    var outtakeTotal = 0;
+    var outtakeTotalWeight = 0; 
+    var table = document.getElementById("outtake-table");
+    var rows = table.getElementsByTagName("tr");
+    for (var j = 1; j < rows.length; j++) {
+        if (rows[j].style.display !== "none") { 
+            var rowCells = rows[j].getElementsByTagName("td");
+            var quantity = parseFloat(rowCells[5].innerText); 
+            var valuePerItem = parseFloat(rowCells[2].innerText); 
+            var weight = parseFloat(rowCells[3].innerText); 
+
+            outtakeTotal += isNaN(quantity) || isNaN(valuePerItem) ? 0 : (quantity * valuePerItem);
+            outtakeTotalWeight += isNaN(quantity) || isNaN(weight) ? 0 : (quantity * weight);
+        }
+    }
+    document.getElementById("outtake-total").innerText = "Total Value: $" + outtakeTotal.toFixed(2);
+    document.getElementById("outtake-total-weight").innerText = "Total Weight: " + outtakeTotalWeight.toFixed(2) + " lbs"; 
+}
+
+
+function filterIntakeByDate() {
+    var inputStart, inputEnd, filterStart, filterEnd, table, tr, td, i;
+    inputStart = document.getElementById("intake-date-filter-start");
+    inputEnd = document.getElementById("intake-date-filter-end");
+    filterStart = inputStart.value ? new Date(inputStart.value + 'T00:00:00') : null;
+    filterEnd = inputEnd.value ? new Date(inputEnd.value + 'T23:59:59') : null;
+
+    console.log('Start date:', filterStart);
+    console.log('End date:', filterEnd);
+
+    table = document.getElementById("intake-table");
+    tr = table.getElementsByTagName("tr");
+    for (i = 0; i < tr.length; i++) {
+        var timestamp_td = tr[i].getElementsByTagName("td")[4]; 
+        if (timestamp_td) {
+            var timestamp_text = timestamp_td.textContent;
+            var timestamp = new Date(timestamp_text); 
+            if ((filterStart === null && filterEnd === null) || (timestamp >= filterStart && timestamp <= filterEnd)) {
+                tr[i].style.display = "";
+            } else {
+                tr[i].style.display = "none";
+            }
+        }
+    }
+    calculateIntakeTotal(); 
+}
+
+
+        function clearIntakeDates() {
+            document.getElementById("intake-date-filter-start").value = "";
+            document.getElementById("intake-date-filter-end").value = "";
+            filterIntakeByDate();
+            toggleClearIntakeDates(); 
+        }
+
+        function toggleClearIntakeDates() {
+            var startDate = document.getElementById("intake-date-filter-start").value;
+            var endDate = document.getElementById("intake-date-filter-end").value;
+            var clearDateButton = document.getElementById("clear-date-button-intake");
+
+            if (startDate || endDate) {
+                clearDateButton.style.display = "inline-block";
+            } else {
+                clearDateButton.style.display = "none";
+            }
+        }
+
+function filterOuttakeByDate() {
+    var inputStart, inputEnd, filterStart, filterEnd, table, tr, td, i;
+    inputStart = document.getElementById("outtake-date-filter-start");
+    inputEnd = document.getElementById("outtake-date-filter-end");
+    filterStart = inputStart.value ? new Date(inputStart.value + 'T00:00:00') : null;
+    filterEnd = inputEnd.value ? new Date(inputEnd.value + 'T23:59:59') : null;
+
+    console.log('Start date:', filterStart);
+    console.log('End date:', filterEnd);
+
+    table = document.getElementById("outtake-table");
+    tr = table.getElementsByTagName("tr");
+    for (i = 0; i < tr.length; i++) {
+        var timestamp_td = tr[i].getElementsByTagName("td")[5]; 
+        if (timestamp_td) {
+            var timestamp_text = timestamp_td.textContent;
+            var timestamp = new Date(timestamp_text); 
+            if ((filterStart === null && filterEnd === null) || (timestamp >= filterStart && timestamp <= filterEnd)) {
+                tr[i].style.display = "";
+            } else {
+                tr[i].style.display = "none";
+            }
+        }
+    }
+    calculateOuttakeTotal(); 
+}
+
+
+        function clearOuttakeDates() {
+            document.getElementById("outtake-date-filter-start").value = "";
+            document.getElementById("outtake-date-filter-end").value = "";
+            filterOuttakeByDate();
+            toggleClearOuttakeDates(); 
+        }
+
+        function toggleClearOuttakeDates() {
+            var startDate = document.getElementById("outtake-date-filter-start").value;
+            var endDate = document.getElementById("outtake-date-filter-end").value;
+            var clearDateButton = document.getElementById("clear-date-button-outtake");
+
+            if (startDate || endDate) {
+                clearDateButton.style.display = "inline-block";
+            } else {
+                clearDateButton.style.display = "none";
+            }
+        }
+function printIntakeTable() {
+    var intakeTable = document.getElementById("intake-table").outerHTML;
+    var intakeTotal = document.getElementById("intake-total").outerHTML; 
+    var intakeTotalWeight = document.getElementById("intake-total-weight").outerHTML;
+    var printContents = intakeTable + intakeTotal + intakeTotalWeight;
+
+    // Open a new window
+    var printWindow = window.open('', '', 'height=600,width=800');
+    printWindow.document.open();
+    printWindow.document.write('<html><head><title>Intake Table Print</title>');
+    printWindow.document.write('<style>@media print {');
+    printWindow.document.write('.table-bordered, .table-bordered th, .table-bordered td { border: 1px solid black !important; }');
+    printWindow.document.write('.table-bordered th, .table-bordered td { border: 1px solid black !important; padding: 0.5rem; }');
+    printWindow.document.write('.table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; color: #212529; }');
+    printWindow.document.write('.table th, .table td { vertical-align: top; border-top: 1px solid black; }');
+    printWindow.document.write('img[src$="/static/images/edit.png"] { display: none; }');
+    printWindow.document.write('}</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(printContents);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.print();
+}
+
+function printOuttakeTable() {
+    var outtakeTable = document.getElementById("outtake-table").outerHTML;
+    var outtakeTotal = document.getElementById("outtake-total").outerHTML; 
+    var outtakeTotalWeight = document.getElementById("outtake-total-weight").outerHTML;
+    var printContents = outtakeTable + outtakeTotal + outtakeTotalWeight;
+
+    var printWindow = window.open('', '', 'height=600,width=800');
+    printWindow.document.open();
+    printWindow.document.write('<html><head><title>Outtake Table Print</title>');
+    printWindow.document.write('<style>@media print {');
+    printWindow.document.write('.table-bordered, .table-bordered th, .table-bordered td { border: 1px solid black !important; }');
+    printWindow.document.write('.table-bordered th, .table-bordered td { border: 1px solid black !important; padding: 0.5rem; }');
+    printWindow.document.write('.table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; color: #212529; }');
+    printWindow.document.write('.table th, .table td { vertical-align: top; border-top: 1px solid black; }');
+    printWindow.document.write('img[src$="/static/images/edit.png"] { display: none; }');
+    printWindow.document.write('}</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(printContents);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.print();
+}
+
+
+
+        window.onload = function() {
+            toggleReport(); 
+            calculateIntakeTotal(); 
+            calculateOuttakeTotal();
+            toggleClearIntakeDates();
+            toggleClearOuttakeDates();
+            sortTableByDate('intake-table', 4); 
+            sortTableByDate('outtake-table', 5);
+        };
+
+        document.addEventListener('DOMContentLoaded', (event) => {
+            filterIntakeByDate();
+            filterOuttakeByDate();
+        });
+
+    function sortTableByDate(tableId, column) {
+        var table, rows, switching, i, x, y, shouldSwitch;
+        table = document.getElementById(tableId);
+        switching = true;
+        
+        while (switching) {
+
+            switching = false;
+            rows = table.rows;
+            
+            for (i = 1; i < (rows.length - 1); i++) {
+                shouldSwitch = false;
+                x = rows[i].getElementsByTagName("td")[column];
+                y = rows[i + 1].getElementsByTagName("td")[column];
+                if (x && y) {
+                    if (new Date(x.textContent) > new Date(y.textContent)) {
+                        shouldSwitch = true;
+                        break;
+                    }
+                }
+            }
+            if (shouldSwitch) {
+                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                switching = true;
+            }
+        }
+    }
+    window.onload = function() {
+        sortTableByDate('myTable', 0);
+    };
+function deleteTransaction(transactionId, type) {
+    Swal.fire({
+        title: 'Are you sure?',
+        text: "You won't be able to revert this!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            var url = type === 'intake' ? '/delete_intake_transaction' : '/delete_outtake_transaction';
+            var data = { 'transaction_id': transactionId };
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    Swal.fire(
+                        'Deleted!',
+                        'Your transaction has been deleted.',
+                        'success'
+                    ).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire(
+                        'Error!',
+                        'Failed to delete transaction: ' + data.message,
+                        'error'
+                    );
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                Swal.fire(
+                    'Error!',
+                    'Something went wrong!',
+                    'error'
+                );
+            });
+        }
+    });
+}
+
+    </script>
+</body>
+</html>
+{% endblock %}
